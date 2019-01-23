@@ -33,7 +33,7 @@ class BBallData(Dataset):
         else:
             self.test_data, self.test_labels = self.fetch_data(self.test_filename)
 
-    
+
     def __getitem__(self, index):
         if self.train:
             seq, target = self.train_data[index], self.train_labels[index]
@@ -52,10 +52,11 @@ class BBallData(Dataset):
         data = np.zeros((self.n, SEQ_LENGTH, X_DIM))
 
         if os.path.isfile(DATAPATH+filename+'.p'):
+            print("Attempting to open", DATAPATH+filename+'.p')
             data = pickle.load(open(DATAPATH+filename+'.p', 'rb'))
         else:
             counter = 0
-            file = open(DATAPATH+file+'.txt')
+            file = open(DATAPATH+filename+'.txt')
             for line in file:
                 t = counter % SEQ_LENGTH
                 s = int((counter - t) / SEQ_LENGTH)

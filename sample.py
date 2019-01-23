@@ -25,12 +25,20 @@ trial = args.trial
 save_path = 'saved/%03d/' % trial
 params = pickle.load(open(save_path+'params.p', 'rb'))
 
+if not torch.cuda.is_available():
+	params['cuda'] = False
+
 # make samples folder
 if not os.path.exists(save_path+'samples/'):
 	os.makedirs(save_path+'samples/')
 
 # load the model
-state_dict = torch.load(save_path+'model/'+params['model']+'_state_dict_'+args.model+'.pth')
+if params['cuda']:
+	state_dict = torch.load(save_path+'model/'+params['model']+'_state_dict_'
+													+args.model+'.pth')
+else:
+	state_dict = torch.load(save_path+'model/'+params['model']+'_state_dict_'
+													+args.model+'.pth', map_location='cpu')
 model = eval(params['model'])(params)
 if params['cuda']:
 	model.cuda()
