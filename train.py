@@ -66,9 +66,9 @@ def run_epoch(train, hp):
 		
 		for key in batch_losses:
 			if batch_idx == 0:
-				losses[key] = batch_losses[key].data[0]
+				losses[key] = batch_losses[key].item()
 			else:
-				losses[key] += batch_losses[key].data[0]
+				losses[key] += batch_losses[key].item()
 
 	for key in losses:
 		losses[key] /= len(loader.dataset)
@@ -186,6 +186,7 @@ best_test_loss = 0
 lr = start_lr
 
 for e in range(n_epochs):
+	print("Starting epoch:", e)
 	epoch = e+1
 
 	hyperparams = {
