@@ -22,11 +22,12 @@ class BBallData(Dataset):
     test_filename = 'Xte_role'
 
 
-    def __init__(self, train=True, preprocess=True, subsample=1):
+    def __init__(self, train=True, preprocess=True, subsample=1, train_def=False):
         self.preprocess = preprocess
         self.train = train
         self.n = N_TRAIN if train else N_TEST
         self.subsample = subsample
+        self.train_def = train_def
 
         if self.train:
             self.train_data, self.train_labels = self.fetch_data(self.train_filename)
@@ -49,6 +50,8 @@ class BBallData(Dataset):
 
     def fetch_data(self, filename):
         labels = pickle.load(open(DATAPATH+filename+'_macro.p', 'rb'))
+
+        # Shape = (N_TRAIN=107146, 50, 22)
         data = np.zeros((self.n, SEQ_LENGTH, X_DIM))
 
         if os.path.isfile(DATAPATH+filename+'.p'):
@@ -64,9 +67,14 @@ class BBallData(Dataset):
                 counter += 1
             pickle.dump(data, open(DATAPATH+filename+'.p', 'wb'))
 
-        # get just the offensive players
-        inds_data = cfg.COORDS['offense']['xy']
-        inds_labels = [int(i/2) for i in inds_data[::2]]
+        if self.train_def:
+            # get all the players
+            inds_data = cfg.COORDS[cfg.OFFENSE]['xy'] + cfg.COORDS[cfg.DEFENSE]['xy']
+            inds_labels = [int(i/2) for i in inds_data[::2]]
+        else:
+            # get just the offensive players
+            inds_data = cfg.COORDS[cfg.OFFENSE]['xy']
+            inds_labels = [int(i/2) for i in inds_data[::2]]
 
         # subsample data
         data = data[:,::self.subsample,inds_data]

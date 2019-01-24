@@ -107,6 +107,7 @@ parser.add_argument('--warmup', type=int, required=False, default=0, help='warmu
 parser.add_argument('--pretrain', type=int, required=False, default=50, help='num epochs to train macro-goal policy')
 parser.add_argument('--cuda', action='store_true', default=False, help='use GPU')
 parser.add_argument('--cont', action='store_true', default=False, help='continue training a model')
+parser.add_argument('--train_def', action='store_true', default=False, help='train on defense in addition to offense')
 args = parser.parse_args()
 
 if not torch.cuda.is_available():
@@ -128,7 +129,8 @@ params = {
 	'n_layers' : args.n_layers,
 	'subsample' : args.subsample,
 	'seed' : args.seed,
-	'cuda' : args.cuda
+	'cuda' : args.cuda,
+	'train_def' : args.train_def
 }
 
 # hyperparameters
@@ -175,10 +177,12 @@ if args.cont:
 
 kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
 train_loader = torch.utils.data.DataLoader(
-	BBallData(train=True, preprocess=True, subsample=params['subsample']), 
+	BBallData(train=True, preprocess=True, subsample=params['subsample'],
+		train_def=params['train_def']),
 	batch_size=batch_size, shuffle=True, **kwargs)
 test_loader = torch.utils.data.DataLoader(
-	BBallData(train=False, preprocess=True, subsample=params['subsample']), 
+	BBallData(train=False, preprocess=True, subsample=params['subsample'],
+		train_def=params['train_def']),
 	batch_size=batch_size, shuffle=True, **kwargs)
 
 
