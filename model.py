@@ -186,6 +186,10 @@ class MACRO_VRNN(nn.Module):
 			y_t = ret[t].clone()
 			m_t = m[t].clone()
 
+			# Since i is looping over the first n agents, when train_def is
+			# turned on, and n_agents = 5,
+			# the defense is not affected by the sampling procedure.
+
 			for i in range(n_agents):
 				dec_macro_t = self.dec_macro[i](torch.cat([y_t, h_macro[-1]], 1))
 				m_t[i] = sample_multinomial(torch.exp(dec_macro_t))

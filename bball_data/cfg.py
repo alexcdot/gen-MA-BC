@@ -38,6 +38,8 @@ for pt in PLAYER_TYPES:
 	COORDS[pt]['y'] = COORDS[pt]['xy'][1::2]
 
 CMAP_ALL = ['orange'] + ['b']*5 + ['r']*5
+CMAP_ALL_PLAYERS = ['b']*5 + ['r']*5
+CMAP_OFFENSE_FOCUSED_PLAYERS = ['b', 'c', 'g', 'm', 'y'] + ['r']*5
 CMAP_OFFENSE = ['b', 'r', 'g', 'm', 'y']
 
 NORMALIZE = [LENGTH, WIDTH] * int(SEQUENCE_DIMENSION/2)
