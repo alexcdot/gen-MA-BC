@@ -92,7 +92,12 @@ parser.add_argument('--m_dim', type=int, required=True, help='macro-goal dimensi
 parser.add_argument('--rnn_dim', type=int, required=True, help='num recurrent cells for next action/state')
 parser.add_argument('--rnn_micro_dim', type=int, required=True, help='same as rnn_dim for macro-goal models')
 parser.add_argument('--rnn_macro_dim', type=int, required=True, help='num recurrent cells for macro-goals')
-parser.add_argument('--n_agents', type=int, required=True)
+parser.add_argument('--n_agents', type=int, required=False, default=0)
+parser.add_argument('--n_trained_off', type=int, required=False, default=0)
+parser.add_argument('--n_gt_off', type=int, required=False, default=0)
+parser.add_argument('--n_trained_def', type=int, required=False, default=0)
+parser.add_argument('--n_gt_def', type=int, required=False, default=0)
+
 parser.add_argument('--n_layers', type=int, required=False, default=1, help='num layers in recurrent cells')
 parser.add_argument('--subsample', type=int, required=False, default=1, help='subsample sequeneces')
 parser.add_argument('--seed', type=int, required=False, default=128, help='PyTorch random seed')
@@ -107,7 +112,6 @@ parser.add_argument('--warmup', type=int, required=False, default=0, help='warmu
 parser.add_argument('--pretrain', type=int, required=False, default=50, help='num epochs to train macro-goal policy')
 parser.add_argument('--cuda', action='store_true', default=False, help='use GPU')
 parser.add_argument('--cont', action='store_true', default=False, help='continue training a model')
-parser.add_argument('--train_def', action='store_true', default=False, help='train on defense in addition to offense')
 args = parser.parse_args()
 
 if not torch.cuda.is_available():
@@ -126,11 +130,14 @@ params = {
 	'rnn_micro_dim' : args.rnn_micro_dim,
 	'rnn_macro_dim' : args.rnn_macro_dim,
 	'n_agents' : args.n_agents,
+	'n_trained_def' : args.n_trained_def,
+	'n_trained_off' : args.n_trained_off,
+	'n_gt_def' : args.n_gt_def,
+	'n_gt_off' : args.n_gt_off,
 	'n_layers' : args.n_layers,
 	'subsample' : args.subsample,
 	'seed' : args.seed,
-	'cuda' : args.cuda,
-	'train_def' : args.train_def
+	'cuda' : args.cuda
 }
 
 # hyperparameters
@@ -178,11 +185,11 @@ if args.cont:
 kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
 train_loader = torch.utils.data.DataLoader(
 	BBallData(train=True, preprocess=True, subsample=params['subsample'],
-		train_def=params['train_def']),
+		params=params),
 	batch_size=batch_size, shuffle=True, **kwargs)
 test_loader = torch.utils.data.DataLoader(
 	BBallData(train=False, preprocess=True, subsample=params['subsample'],
-		train_def=params['train_def']),
+		params=params),
 	batch_size=batch_size, shuffle=True, **kwargs)
 
 
