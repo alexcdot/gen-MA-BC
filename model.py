@@ -13,19 +13,37 @@ def process_input_data(input_type, data, macro, params):
 	if input_type == 'y':
 		return data
 	elif input_type == 'xy':
+		# Get the trained offense and defense for x
 		n_agents = params['n_agents']
-		x = data[1:,:,:2*n_agents].clone()
-		x = x.view(x.size(0), x.size(1), n_agents, -1).transpose(1,2)
+		n_trained_off = max(params['n_trained_off'], n_agents)
+		n_gt_off = params['n_gt_off']
+		n_trained_def = params['n_trained_def']
+		n_offense = n_trained_off + n_gt_off
+		trained_indices = [i for i in range(2 * n_trained_off)] + \
+			[i for i in range(2 * n_offense, 2 * (n_offense + n_trained_def))]
+		n_trained_players = n_trained_off + n_trained_def
+
+		x = data[1:,:, trained_indices].clone()
+		x = x.view(x.size(0), x.size(1), n_trained_players, -1).transpose(1,2)
 		y = data
 		return x, y
 	elif input_type == 'xym':
+		# Get the trained offense and defense for x
 		n_agents = params['n_agents']
-		x = data[1:,:,:2*n_agents].clone()
-		x = x.view(x.size(0), x.size(1), n_agents, -1).transpose(1,2)
+		n_trained_off = max(params['n_trained_off'], n_agents)
+		n_gt_off = params['n_gt_off']
+		n_trained_def = params['n_trained_def']
+		n_offense = n_trained_off + n_gt_off
+		trained_indices = [i for i in range(2 * n_trained_off)] + \
+			[i for i in range(2 * n_offense, 2 * (n_offense + n_trained_def))]
+		n_trained_players = n_trained_off + n_trained_def
+
+		x = data[1:,:, trained_indices].clone()
+		x = x.view(x.size(0), x.size(1), n_trained_players, -1).transpose(1,2)
 		y = data
 
-		macro_ohe = torch.zeros(data.size(0), n_agents, data.size(1), 90)
-		for i in range(n_agents):
+		macro_ohe = torch.zeros(data.size(0), n_trained_players, data.size(1), 90)
+		for i in range(n_trained_players):
 			macro_ohe[:,i,:,:] = one_hot_encode(macro[:,:,i].data, 90)
 		macro_ohe = Variable(macro_ohe).cuda() if macro.is_cuda else Variable(macro_ohe)
 
@@ -67,28 +85,31 @@ class MACRO_VRNN(nn.Module):
 		rnn_macro_dim = params['rnn_macro_dim']
 		n_layers = params['n_layers']
 		n_agents = params['n_agents']
+		n_trained_off = max(params['n_trained_off'], n_agents)
+		n_trained_def = params['n_trained_def']
+		n_trained_players = n_trained_def + n_trained_off
 
 		# takes the y, rnn_macro, and outputs m
 		self.dec_macro = nn.ModuleList([nn.Sequential(
 			nn.Linear(y_dim+rnn_macro_dim, h_dim),
 			nn.ReLU(),
 			nn.Linear(h_dim, m_dim),
-			nn.LogSoftmax()) for i in range(n_agents)])
+			nn.LogSoftmax()) for i in range(n_trained_players)])
 
 		# takes the x, m, rnn_micro, and outputs h
 		self.enc = nn.ModuleList([nn.Sequential(
 			nn.Linear(x_dim+m_dim+rnn_micro_dim, h_dim),
 			nn.ReLU(),
 			nn.Linear(h_dim, h_dim),
-			nn.ReLU()) for i in range(n_agents)])
+			nn.ReLU()) for i in range(n_trained_players)])
 
 		# Takes h, outputs z
-		self.enc_mean = nn.ModuleList([nn.Linear(h_dim, z_dim) for i in range(n_agents)])
+		self.enc_mean = nn.ModuleList([nn.Linear(h_dim, z_dim) for i in range(n_trained_players)])
 
 		# Takes h, outputs z
 		self.enc_std = nn.ModuleList([nn.Sequential(
 			nn.Linear(h_dim, z_dim),
-			nn.Softplus()) for i in range(n_agents)])
+			nn.Softplus()) for i in range(n_trained_players)])
 
 		# Takes m_dim, and rnn_micro (no x_dim), outputs h
 		# Otherwise, dims are same as enc
@@ -96,30 +117,30 @@ class MACRO_VRNN(nn.Module):
 			nn.Linear(m_dim+rnn_micro_dim, h_dim),
 			nn.ReLU(),
 			nn.Linear(h_dim, h_dim),
-			nn.ReLU()) for i in range(n_agents)])
-		self.prior_mean = nn.ModuleList([nn.Linear(h_dim, z_dim) for i in range(n_agents)])
+			nn.ReLU()) for i in range(n_trained_players)])
+		self.prior_mean = nn.ModuleList([nn.Linear(h_dim, z_dim) for i in range(n_trained_players)])
 		self.prior_std = nn.ModuleList([nn.Sequential(
 			nn.Linear(h_dim, z_dim),
-			nn.Softplus()) for i in range(n_agents)])
+			nn.Softplus()) for i in range(n_trained_players)])
 
 		# takes y, m, z, rnn_micro, outputs h_dim
 		self.dec = nn.ModuleList([nn.Sequential(
 			nn.Linear(y_dim+m_dim+z_dim+rnn_micro_dim, h_dim),
 			nn.ReLU(),
 			nn.Linear(h_dim, h_dim),
-			nn.ReLU()) for i in range(n_agents)])
+			nn.ReLU()) for i in range(n_trained_players)])
 
 		# takes h, outputs x
-		self.dec_mean = nn.ModuleList([nn.Linear(h_dim, x_dim) for i in range(n_agents)])
+		self.dec_mean = nn.ModuleList([nn.Linear(h_dim, x_dim) for i in range(n_trained_players)])
 		self.dec_std = nn.ModuleList([nn.Sequential(
 			nn.Linear(h_dim, x_dim),
-			nn.Softplus()) for i in range(n_agents)])
+			nn.Softplus()) for i in range(n_trained_players)])
 
 		# takes x and z, outputs rnn_micro
 		self.gru_micro = nn.ModuleList([nn.GRU(x_dim+z_dim, rnn_micro_dim, n_layers)
-			for i in range(n_agents)])
+			for i in range(n_trained_players)])
 		# takes m * n, outputs rnn_macro
-		self.gru_macro = nn.GRU(m_dim*n_agents, rnn_macro_dim, n_layers)
+		self.gru_macro = nn.GRU(m_dim*n_trained_players, rnn_macro_dim, n_layers)
 
 
 	def forward(self, data, macro=None, hp=None):
@@ -132,9 +153,12 @@ class MACRO_VRNN(nn.Module):
 			out['kl_loss'] = 0
 
 		n_agents = self.params['n_agents']
+		n_trained_off = max(self.params['n_trained_off'], n_agents)
+		n_trained_def = self.params['n_trained_def']
+		n_trained_players = n_trained_def + n_trained_off
 		
 		h_micro = [Variable(torch.zeros(self.params['n_layers'], y.size(1), self.params['rnn_micro_dim']))
-			for i in range(n_agents)]
+			for i in range(n_trained_players)]
 		h_macro = Variable(torch.zeros(self.params['n_layers'], y.size(1), self.params['rnn_macro_dim']))
 		if self.params['cuda']:
 			h_macro = h_macro.cuda()
@@ -146,7 +170,7 @@ class MACRO_VRNN(nn.Module):
 			m_t = m[t].clone()
 			
 			if hp['pretrain']:
-				for i in range(n_agents):
+				for i in range(n_trained_players):
 					dec_macro_t = self.dec_macro[i](torch.cat([y_t, h_macro[-1]], 1))
 					out['recon_loss'] -= torch.sum(m_t[i]*dec_macro_t)
 	
@@ -154,7 +178,7 @@ class MACRO_VRNN(nn.Module):
 				_, h_macro = self.gru_macro(torch.cat([m_t_concat], 1).unsqueeze(0), h_macro)
 
 			else:
-				for i in range(n_agents):
+				for i in range(n_trained_players):
 					enc_t = self.enc[i](torch.cat([x_t[i], m_t[i], h_micro[i][-1]], 1))
 					enc_mean_t = self.enc_mean[i](enc_t)
 					enc_std_t = self.enc_std[i](enc_t)
@@ -181,17 +205,20 @@ class MACRO_VRNN(nn.Module):
 		x, y, m = process_input_data(self.input_type, data, macro, self.params)
 
 		n_agents = self.params['n_agents']
+		n_trained_off = max(self.params['n_trained_off'], n_agents)
+		n_trained_def = self.params['n_trained_def']
+		n_trained_players = n_trained_def + n_trained_off
 
 		if seq_len == 0:
 			seq_len = y.size(0)-1
 
 		if len(fix_m) == 0:
-			fix_m = [-1]*n_agents
+			fix_m = [-1]*n_trained_players
 
 		h_micro = [Variable(torch.zeros(self.params['n_layers'], y.size(1), self.params['rnn_micro_dim']))
-			for i in range(n_agents)]
+			for i in range(n_trained_players)]
 		h_macro = Variable(torch.zeros(self.params['n_layers'], y.size(1), self.params['rnn_macro_dim']))
-		macro_goals = Variable(torch.zeros(seq_len+1, y.size(1), n_agents))
+		macro_goals = Variable(torch.zeros(seq_len+1, y.size(1), n_trained_players))
 		if self.params['cuda']:
 			h_macro, macro_goals = h_macro.cuda(), macro_goals.cuda()
 			h_micro = cudafy_list(h_micro)
@@ -206,7 +233,7 @@ class MACRO_VRNN(nn.Module):
 			# turned on, and n_agents = 5,
 			# the defense is not affected by the sampling procedure.
 
-			for i in range(n_agents):
+			for i in range(n_trained_players):
 				dec_macro_t = self.dec_macro[i](torch.cat([y_t, h_macro[-1]], 1))
 				m_t[i] = sample_multinomial(torch.exp(dec_macro_t))
 
@@ -214,7 +241,7 @@ class MACRO_VRNN(nn.Module):
 			m_t_concat = m_t.transpose(0,1).contiguous().view(y.size(1), -1)
 			_, h_macro = self.gru_macro(torch.cat([m_t_concat], 1).unsqueeze(0), h_macro)
 
-			for i in range(n_agents):
+			for i in range(n_trained_players):
 				prior_t = self.prior[i](torch.cat([m_t[i], h_micro[i][-1]], 1))
 				prior_mean_t = self.prior_mean[i](prior_t)
 				prior_std_t = self.prior_std[i](prior_t)

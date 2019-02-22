@@ -22,12 +22,12 @@ class BBallData(Dataset):
     test_filename = 'Xte_role'
 
 
-    def __init__(self, train=True, preprocess=True, subsample=1, train_def=False):
+    def __init__(self, train=True, preprocess=True, subsample=1, params={}):
         self.preprocess = preprocess
         self.train = train
         self.n = N_TRAIN if train else N_TEST
         self.subsample = subsample
-        self.train_def = train_def
+        self.params = params
 
         if self.train:
             self.train_data, self.train_labels = self.fetch_data(self.train_filename)
@@ -67,14 +67,14 @@ class BBallData(Dataset):
                 counter += 1
             pickle.dump(data, open(DATAPATH+filename+'.p', 'wb'))
 
-        if self.train_def:
-            # get all the players
-            inds_data = cfg.COORDS[cfg.OFFENSE]['xy'] + cfg.COORDS[cfg.DEFENSE]['xy']
-            inds_labels = [int(i/2) for i in inds_data[::2]]
-        else:
-            # get just the offensive players
-            inds_data = cfg.COORDS[cfg.OFFENSE]['xy']
-            inds_labels = [int(i/2) for i in inds_data[::2]]
+        # Get the appropriate number of offense and defensive players
+        n_offense = max(self.params["n_agents"], self.params["n_trained_off"]) + \
+            self.params["n_gt_off"]
+        n_defense = self.params["n_gt_def"] + self.params["n_trained_def"]
+        inds_data = cfg.COORDS[cfg.OFFENSE]['xy'][:2 * n_offense] + \
+            cfg.COORDS[cfg.DEFENSE]['xy'][:2 * n_defense]
+
+        inds_labels = [int(i/2) for i in inds_data[::2]]
 
         # subsample data
         data = data[:,::self.subsample,inds_data]

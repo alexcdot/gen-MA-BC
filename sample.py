@@ -62,7 +62,7 @@ if args.seq_len > 0:
 # load ground-truth burn-ins
 test_loader = torch.utils.data.DataLoader(
 	BBallData(train=False, preprocess=True, subsample=params['subsample'],
-	train_def=args.train_def),
+			  params=params),
 	batch_size=args.n_samples, shuffle=args.shuffle)
 
 data, macro_goals = next(iter(test_loader))
