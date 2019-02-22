@@ -68,22 +68,30 @@ class MACRO_VRNN(nn.Module):
 		n_layers = params['n_layers']
 		n_agents = params['n_agents']
 
+		# takes the y, rnn_macro, and outputs m
 		self.dec_macro = nn.ModuleList([nn.Sequential(
 			nn.Linear(y_dim+rnn_macro_dim, h_dim),
 			nn.ReLU(),
 			nn.Linear(h_dim, m_dim),
 			nn.LogSoftmax()) for i in range(n_agents)])
 
+		# takes the x, m, rnn_micro, and outputs h
 		self.enc = nn.ModuleList([nn.Sequential(
 			nn.Linear(x_dim+m_dim+rnn_micro_dim, h_dim),
 			nn.ReLU(),
 			nn.Linear(h_dim, h_dim),
 			nn.ReLU()) for i in range(n_agents)])
+
+		# Takes h, outputs z
 		self.enc_mean = nn.ModuleList([nn.Linear(h_dim, z_dim) for i in range(n_agents)])
+
+		# Takes h, outputs z
 		self.enc_std = nn.ModuleList([nn.Sequential(
 			nn.Linear(h_dim, z_dim),
 			nn.Softplus()) for i in range(n_agents)])
 
+		# Takes m_dim, and rnn_micro (no x_dim), outputs h
+		# Otherwise, dims are same as enc
 		self.prior = nn.ModuleList([nn.Sequential(
 			nn.Linear(m_dim+rnn_micro_dim, h_dim),
 			nn.ReLU(),
@@ -94,17 +102,23 @@ class MACRO_VRNN(nn.Module):
 			nn.Linear(h_dim, z_dim),
 			nn.Softplus()) for i in range(n_agents)])
 
+		# takes y, m, z, rnn_micro, outputs h_dim
 		self.dec = nn.ModuleList([nn.Sequential(
 			nn.Linear(y_dim+m_dim+z_dim+rnn_micro_dim, h_dim),
 			nn.ReLU(),
 			nn.Linear(h_dim, h_dim),
 			nn.ReLU()) for i in range(n_agents)])
+
+		# takes h, outputs x
 		self.dec_mean = nn.ModuleList([nn.Linear(h_dim, x_dim) for i in range(n_agents)])
 		self.dec_std = nn.ModuleList([nn.Sequential(
 			nn.Linear(h_dim, x_dim),
 			nn.Softplus()) for i in range(n_agents)])
 
-		self.gru_micro = nn.ModuleList([nn.GRU(x_dim+z_dim, rnn_micro_dim, n_layers) for i in range(n_agents)])
+		# takes x and z, outputs rnn_micro
+		self.gru_micro = nn.ModuleList([nn.GRU(x_dim+z_dim, rnn_micro_dim, n_layers)
+			for i in range(n_agents)])
+		# takes m * n, outputs rnn_macro
 		self.gru_macro = nn.GRU(m_dim*n_agents, rnn_macro_dim, n_layers)
 
 
@@ -119,7 +133,8 @@ class MACRO_VRNN(nn.Module):
 
 		n_agents = self.params['n_agents']
 		
-		h_micro = [Variable(torch.zeros(self.params['n_layers'], y.size(1), self.params['rnn_micro_dim'])) for i in range(n_agents)]
+		h_micro = [Variable(torch.zeros(self.params['n_layers'], y.size(1), self.params['rnn_micro_dim']))
+			for i in range(n_agents)]
 		h_macro = Variable(torch.zeros(self.params['n_layers'], y.size(1), self.params['rnn_macro_dim']))
 		if self.params['cuda']:
 			h_macro = h_macro.cuda()
@@ -173,7 +188,8 @@ class MACRO_VRNN(nn.Module):
 		if len(fix_m) == 0:
 			fix_m = [-1]*n_agents
 
-		h_micro = [Variable(torch.zeros(self.params['n_layers'], y.size(1), self.params['rnn_micro_dim'])) for i in range(n_agents)]
+		h_micro = [Variable(torch.zeros(self.params['n_layers'], y.size(1), self.params['rnn_micro_dim']))
+			for i in range(n_agents)]
 		h_macro = Variable(torch.zeros(self.params['n_layers'], y.size(1), self.params['rnn_macro_dim']))
 		macro_goals = Variable(torch.zeros(seq_len+1, y.size(1), n_agents))
 		if self.params['cuda']:
