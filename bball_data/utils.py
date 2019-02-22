@@ -42,6 +42,15 @@ def _set_figax():
 
 def plot_sequence(seq, macro_goals=None, colormap=CMAP, burn_in=0, save_path='', save_name=''):
     n_players = int(len(seq[0])/2)
+    n_offense = len(cfg.CMAP_OFFENSE)
+    # Include defense in plots
+    if n_players > n_offense:
+        # We only trained the offense, so highlight the offensive players
+        if macro_goals.shape[1] <= n_offense:
+            colormap = cfg.CMAP_OFFENSE_FOCUSED_PLAYERS
+        # We trained both offense and defense, so color them the same
+        else:
+            colormap = cfg.CMAP_ALL_PLAYERS
 
     while len(colormap) < n_players:
         colormap += DEF_COLOR
@@ -58,7 +67,10 @@ def plot_sequence(seq, macro_goals=None, colormap=CMAP, burn_in=0, save_path='',
 
         if macro_goals is not None:
             for t in range(len(seq)):
-                if t >= burn_in:
+                # We also check that k does not exceed the number of trained
+                # macro goals. For the untrained defense, we don't have
+                # macro goals for them.
+                if t >= burn_in and k < macro_goals.shape[1]:
                     m_x = int(macro_goals[t,k]/cfg.N_MACRO_Y)
                     m_y = macro_goals[t,k] - cfg.N_MACRO_Y*m_x
                     ax.add_patch(patches.Rectangle(
@@ -85,7 +97,11 @@ def plot_sequence(seq, macro_goals=None, colormap=CMAP, burn_in=0, save_path='',
 
 def animate_sequence(seq, macro_goals=None, colormap=CMAP, burn_in=0, save_path='', save_name=''):
     n_players = int(len(seq[0])/2)
+    n_offense = len(cfg.CMAP_OFFENSE)
     seq_len = len(seq)
+
+    if n_players > n_offense:
+        colormap = cfg.CMAP_ALL_PLAYERS
 
     while len(colormap) < n_players:
         colormap += DEF_COLOR

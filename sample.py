@@ -18,6 +18,8 @@ parser.add_argument('-l', '--seq_len', type=int, default=0, required=False, help
 parser.add_argument('-m', '--model', type=str, default='best', required=False, help='which saved model to sample from')
 parser.add_argument('-f', '--filedesc', type=str, default='', required=False, help='descriptor to add to end of filename')
 parser.add_argument('--shuffle', action='store_true', default=False, help='shuffle ground-truth burn-in from test set')
+parser.add_argument('--train_def', action='store_true', default=False, help='train on defense in addition to offense')
+
 args = parser.parse_args()	
 
 
@@ -59,7 +61,8 @@ if args.seq_len > 0:
 	
 # load ground-truth burn-ins
 test_loader = torch.utils.data.DataLoader(
-	BBallData(train=False, preprocess=True, subsample=params['subsample']),
+	BBallData(train=False, preprocess=True, subsample=params['subsample'],
+	train_def=args.train_def),
 	batch_size=args.n_samples, shuffle=args.shuffle)
 
 data, macro_goals = next(iter(test_loader))
