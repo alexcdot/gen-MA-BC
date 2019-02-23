@@ -201,7 +201,7 @@ class MACRO_VRNN(nn.Module):
 		return out
 
 
-	def sample(self, data, macro, seq_len=0, burn_in=0, fix_m=[]):
+	def sample(self, data, macro, seq_len=0, burn_in=0, fix_m=[], seqs_per_sample=1):
 		x, y, m = process_input_data(self.input_type, data, macro, self.params)
 
 		n_agents = self.params['n_agents']
@@ -218,46 +218,53 @@ class MACRO_VRNN(nn.Module):
 		h_micro = [Variable(torch.zeros(self.params['n_layers'], y.size(1), self.params['rnn_micro_dim']))
 			for i in range(n_trained_players)]
 		h_macro = Variable(torch.zeros(self.params['n_layers'], y.size(1), self.params['rnn_macro_dim']))
+
 		macro_goals = Variable(torch.zeros(seq_len+1, y.size(1), n_trained_players))
 		if self.params['cuda']:
 			h_macro, macro_goals = h_macro.cuda(), macro_goals.cuda()
 			h_micro = cudafy_list(h_micro)
 
-		ret = y.clone()
+		all_rets = []
+		all_macro_goals = []
 
-		for t in range(seq_len):
-			y_t = ret[t].clone()
-			m_t = m[t].clone()
+		for _ in range(seqs_per_sample):
+			ret = y.clone()
+			for t in range(seq_len):
+				y_t = ret[t].clone()
+				m_t = m[t].clone()
 
-			# Since i is looping over the first n agents, when train_def is
-			# turned on, and n_agents = 5,
-			# the defense is not affected by the sampling procedure.
+				# Since i is looping over the first n agents, when train_def is
+				# turned on, and n_agents = 5,
+				# the defense is not affected by the sampling procedure.
 
-			for i in range(n_trained_players):
-				dec_macro_t = self.dec_macro[i](torch.cat([y_t, h_macro[-1]], 1))
-				m_t[i] = sample_multinomial(torch.exp(dec_macro_t))
+				for i in range(n_trained_players):
+					dec_macro_t = self.dec_macro[i](torch.cat([y_t, h_macro[-1]], 1))
+					m_t[i] = sample_multinomial(torch.exp(dec_macro_t))
 
-			macro_goals[t] = torch.max(m_t, 2)[1].transpose(0,1)
-			m_t_concat = m_t.transpose(0,1).contiguous().view(y.size(1), -1)
-			_, h_macro = self.gru_macro(torch.cat([m_t_concat], 1).unsqueeze(0), h_macro)
+				macro_goals[t] = torch.max(m_t, 2)[1].transpose(0,1)
+				m_t_concat = m_t.transpose(0,1).contiguous().view(y.size(1), -1)
+				_, h_macro = self.gru_macro(torch.cat([m_t_concat], 1).unsqueeze(0), h_macro)
 
-			for i in range(n_trained_players):
-				prior_t = self.prior[i](torch.cat([m_t[i], h_micro[i][-1]], 1))
-				prior_mean_t = self.prior_mean[i](prior_t)
-				prior_std_t = self.prior_std[i](prior_t)
+				for i in range(n_trained_players):
+					prior_t = self.prior[i](torch.cat([m_t[i], h_micro[i][-1]], 1))
+					prior_mean_t = self.prior_mean[i](prior_t)
+					prior_std_t = self.prior_std[i](prior_t)
 
-				z_t = sample_gauss(prior_mean_t, prior_std_t)
+					z_t = sample_gauss(prior_mean_t, prior_std_t)
 
-				dec_t = self.dec[i](torch.cat([y_t, m_t[i], z_t, h_micro[i][-1]], 1))
-				dec_mean_t = self.dec_mean[i](dec_t)
-				dec_std_t = self.dec_std[i](dec_t)
+					dec_t = self.dec[i](torch.cat([y_t, m_t[i], z_t, h_micro[i][-1]], 1))
+					dec_mean_t = self.dec_mean[i](dec_t)
+					dec_std_t = self.dec_std[i](dec_t)
 
-				ret[t+1,:,2*i:2*i+2] = y[t+1,:,2*i:2*i+2] if t < burn_in else sample_gauss(dec_mean_t, dec_std_t)
-				_, h_micro[i] = self.gru_micro[i](torch.cat([ret[t+1,:,2*i:2*i+2], z_t], 1).unsqueeze(0), h_micro[i])
-
-		macro_goals.data[-1] = macro_goals.data[-2]
-
-		return ret, macro_goals
+					# ret[t+1,:,2*i:2*i+2] = y[t+1,:,2*i:2*i+2] if t < burn_in or i > 0 else sample_gauss(dec_mean_t, dec_std_t)
+					ret[t+1,:,2*i:2*i+2] = y[t+1,:,2*i:2*i+2] if t < burn_in else sample_gauss(dec_mean_t, dec_std_t)
+					_, h_micro[i] = self.gru_micro[i](torch.cat([ret[t+1,:,2*i:2*i+2], z_t], 1).unsqueeze(0), h_micro[i])
+			print(macro_goals.shape, macro_goals.data.cpu().numpy().shape)
+			macro_goals.data[-1] = macro_goals.data[-2]
+			all_rets.append(ret.data.cpu().numpy())
+			all_macro_goals.append(macro_goals.data.cpu().numpy())
+		print(np.array(all_rets).shape, np.array(all_macro_goals).shape)
+		return np.array(all_rets), np.array(all_macro_goals)
 
 # 103
 class VRNN_INDEP(nn.Module):

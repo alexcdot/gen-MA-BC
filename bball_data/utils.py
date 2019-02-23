@@ -94,6 +94,68 @@ def plot_sequence(seq, macro_goals=None, colormap=CMAP, burn_in=0, save_path='',
     else:
         plt.show()
 
+def plot_sample_seqs(sample_seqs, sample_macro_goals=None, colormap=CMAP, burn_in=0, save_path='', save_name=''):
+    n_players = int(sample_seqs.shape[2]/2)
+    n_offense = len(cfg.CMAP_OFFENSE)
+    # Include defense in plots
+    if n_players > n_offense:
+        # We only trained the offense, so highlight the offensive players
+        if len(sample_macro_goals) > 0 and sample_macro_goals.shape[2] <= n_offense:
+            colormap = cfg.CMAP_OFFENSE_FOCUSED_PLAYERS
+        # We trained both offense and defense, so color them the same
+        else:
+            colormap = cfg.CMAP_ALL_PLAYERS
+
+    while len(colormap) < n_players:
+        colormap += DEF_COLOR
+
+    fig, ax = _set_figax()
+
+    for i, seq in enumerate(sample_seqs):
+        if len(sample_macro_goals) > 0:
+            macro_goals = sample_macro_goals[i]
+        for k in range(n_players):
+            x = seq[:,(2*k)]
+            y = seq[:,(2*k+1)]
+            color = colormap[k]
+            dilution_factor = np.log(len(sample_seqs) + 1)
+
+            ax.plot(SCALE*x, SCALE*y, color=color, linewidth=3, alpha=0.5 / dilution_factor)
+            # ax.plot(SCALE*x, SCALE*y, 'o', color=color, markersize=8, alpha=0.5)
+
+            if len(sample_macro_goals) > 0:
+                for t in range(len(seq)):
+                    # We also check that k does not exceed the number of trained
+                    # macro goals. For the untrained defense, we don't have
+                    # macro goals for them.
+                    if t >= burn_in and k < macro_goals.shape[1]:
+                        m_x = int(macro_goals[t,k]/cfg.N_MACRO_Y)
+                        m_y = macro_goals[t,k] - cfg.N_MACRO_Y*m_x
+                        ax.add_patch(patches.Rectangle(
+                            (m_x*MACRO_SIZE, m_y*MACRO_SIZE), MACRO_SIZE, MACRO_SIZE,
+                             alpha=0.02 / dilution_factor, color=color, linewidth=2))
+
+        # only plot these once
+        if i == 0:
+            # starting positions
+            print(seq.shape, seq[::2].shape)
+            x = seq[0, ::2]
+            y = seq[0, 1::2]
+            ax.plot(SCALE*x, SCALE*y, 'o', color='black', markersize=12)
+
+            # burn-ins
+            if burn_in > 0:
+                x = seq[:burn_in,::2]
+                y = seq[:burn_in,1::2]
+                ax.plot(SCALE*x, SCALE*y, color='0.01', linewidth=8, alpha=0.5)
+
+    plt.tight_layout(pad=0)
+
+    if len(save_name) > 0:
+        plt.savefig(save_path+save_name+'.png')
+    else:
+        plt.show()
+
 
 def animate_sequence(seq, macro_goals=None, colormap=CMAP, burn_in=0, save_path='', save_name=''):
     n_players = int(len(seq[0])/2)

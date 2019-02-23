@@ -16,9 +16,9 @@ parser.add_argument('-n', '--n_samples', type=int, default=5, required=False, he
 parser.add_argument('-b', '--burn_in', type=int, default=0, required=False, help='burn-in period')
 parser.add_argument('-l', '--seq_len', type=int, default=0, required=False, help='length of sequence')
 parser.add_argument('-m', '--model', type=str, default='best', required=False, help='which saved model to sample from')
+parser.add_argument('-s', '--seqs_per_sample', type=int, default=1, required=False, help='number of sequences per sample')
 parser.add_argument('-f', '--filedesc', type=str, default='', required=False, help='descriptor to add to end of filename')
 parser.add_argument('--shuffle', action='store_true', default=False, help='shuffle ground-truth burn-in from test set')
-parser.add_argument('--train_def', action='store_true', default=False, help='train on defense in addition to offense')
 
 args = parser.parse_args()	
 
@@ -49,6 +49,7 @@ model.load_state_dict(state_dict)
 # set the burn-in (and save for plotting)
 # TODO: need a better way to save different burn-ins for different sets of samples
 params['burn_in'] = args.burn_in
+params['seqs_per_sample'] = args.seqs_per_sample
 pickle.dump(params, open(save_path+'params.p', 'wb'), protocol=2)
 print(params)
 
@@ -74,14 +75,17 @@ macro_goals = Variable(macro_goals.squeeze().transpose(0, 1))
 
 # generate samples
 if params.get('genMacro'):
-	samples, macro_samples = model.sample(data, macro_goals, burn_in=params['burn_in'], seq_len=args.seq_len)
-
+	samples, macro_samples = model.sample(data, macro_goals, burn_in=params['burn_in'],
+										  seq_len=args.seq_len, seqs_per_sample=args.seqs_per_sample)
 	# save macro-goals
-	macro_samples = macro_samples.data.cpu().numpy()
+	if hasattr(macro_samples.data, "cpu"):
+		macro_samples = macro_samples.data.cpu().numpy()
 	pickle.dump(macro_samples, open(save_path+'samples/macro_goals'+file_desc+'.p', 'wb'))
 else:
-	samples = model.sample(data, macro_goals, burn_in=params['burn_in'], seq_len=args.seq_len)
+	samples = model.sample(data, macro_goals, burn_in=params['burn_in'],
+						   seq_len=args.seq_len, seqs_per_sample=args.seqs_per_sample)
 
 # save samples
-samples = samples.data.cpu().numpy()
+if hasattr(samples.data, "cpu"):
+	samples = samples.data.cpu().numpy()
 pickle.dump(samples, open(save_path+'samples/samples'+file_desc+'.p', 'wb'))

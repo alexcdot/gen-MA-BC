@@ -4,7 +4,7 @@ import numpy as np
 import os
 import pickle
 
-from bball_data.utils import unnormalize, plot_sequence, animate_sequence
+from bball_data.utils import unnormalize, plot_sequence, animate_sequence, plot_sample_seqs
 
 
 parser = argparse.ArgumentParser()
@@ -33,22 +33,41 @@ if args.params:
 # load samples
 file_desc = '' if len(args.filedesc) == 0 else '_'+args.filedesc
 samples = pickle.load(open(load_path+'samples/samples'+file_desc+'.p', 'rb'))
-samples = np.swapaxes(samples, 0, 1)
+# samples = np.swapaxes(samples, 0, 1)
 
 # load macro-goals
-macro_goals = [None]*len(samples)
+macro_goals = None
 if params.get('genMacro') and args.showmacro:
 	macro_goals = pickle.load(open(load_path+'samples/macro_goals'+file_desc+'.p', 'rb'))
-	macro_goals = np.swapaxes(macro_goals, 0, 1)
+	# macro_goals = np.swapaxes(macro_goals, 0, 1)
+
+# Get sequences per sample
+if params.get("seqs_per_sample") is not None:
+	seqs_per_sample = params["seqs_per_sample"]
+else:
+	seqs_per_sample = 1
 
 # plot samples (and save)
-for k, sample in enumerate(samples):
+for k in range(samples.shape[2]):
 	print('Sample %02d' % k)
-	sample = unnormalize(sample)
-	macro = macro_goals[k]
 	save_name = '%02d' % k if args.save else ''
+	sample_seqs = []
+	sample_macros = []
+
+	for i in range(seqs_per_sample):
+		sample_seqs.append(unnormalize(np.squeeze(samples[i, :, k, :])))
+		if macro_goals is not None:
+			sample_macros.append(macro_goals[i, :, k, :])
+
+	sample_seqs = np.array(sample_seqs)
+	sample_macros = np.array(sample_macros)
 
 	if not args.animate:
-		plot_sequence(sample, macro_goals=macro, burn_in=params['burn_in'], save_path=save_path, save_name=save_name)	
+		plot_sample_seqs(sample_seqs, sample_macro_goals=sample_macros, burn_in=params['burn_in'],
+						 save_path=save_path, save_name=save_name)
+
+		# plot_sequence(sample_seqs, macro_goals=sample_macros, burn_in=params['burn_in'],
+		# 			  save_path=save_path, save_name=save_name)
 	else:
-		animate_sequence(sample, macro_goals=macro, burn_in=params['burn_in'], save_path=save_path, save_name=save_name)
+		animate_sequence(sample_seqs, macro_goals=sample_macros, burn_in=params['burn_in'],
+						 save_path=save_path, save_name=save_name)
